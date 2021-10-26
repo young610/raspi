@@ -41,14 +41,10 @@ static ssize_t sysfs_store(struct kobject *kobj,struct kobj_attribute *attr,cons
 }
 
 /****     off_timer  show store    *****/
-
-static ssize_t set_period_callback(struct device* dev, 
-    struct device_attribute* attr, 
-    const char* buf, 
-    size_t count) 
+static ssize_t set_period_callback(struct device* dev, struct device_attribute* attr, const char* buf, size_t count) 
 {
 	long period_value = 0;
-
+	
 	if (kstrtol(buf, 10, &period_value) < 0)
 		return -EINVAL;
 	if (period_value < 10)	
@@ -58,18 +54,16 @@ static ssize_t set_period_callback(struct device* dev,
 	return count;
 }
 
-
 struct kobj_attribute delay_attr= __ATTR(delay,0664, sysfs_show,sysfs_store); 
 struct kobj_attribute off_attr= __ATTR(off_timer,0664, 0,set_period_callback);
 
 //******** IRQ HANDLER   *******//
-static irq_handler_t rpi_gpio_irqrising(unsigned int irq, void *dev_id, struct pt_regs *regs)
+static irq_handler_t rpi_gpio_irq(unsigned int irq, void *dev_id, struct pt_regs *regs)
 {
-	int i;
-	int AL = 0;
-
+	
 	if(gpio_get_value(gpiophoto)==1)
 	{
+		timer_setup(&s_BlinkTimer, TimerHandler, 0);
 		printk(KERN_INFO "__ACTLED OFF__(delay %d) [PHOTO : %d ]",delay ,gpio_get_value(gpiophoto));
 		numris++; 
 	}
@@ -77,18 +71,21 @@ static irq_handler_t rpi_gpio_irqrising(unsigned int irq, void *dev_id, struct p
 	{
 		printk(KERN_INFO "==ACTLED ON==(delay %d) [PHOTO : %d ]",delay ,gpio_get_value(gpiophoto));
 		numfal++;
+		mod_timer(&s_BlinkTimer,jiffies + msecs_to_jiffies(s_BlinkPeriod));
 	}
-	
-	do 
-	{
-		AL = !AL;
-		gpio_set_value(ACTLED,AL);
-		mdelay(delay);	
-	}while(time_after(jiffies,timeout))
-
-	add_timer(&s_BlinkTimer,jiffies + msecs_to_jiffies(s_BlinkPeriod));
 
 	return (irq_handler_t) IRQ_HANDLED;		
+}
+
+static void TimerHandler(unsigned long unused)
+{
+	int i;
+	static bool AL = 0;
+	
+		AL = !AL;
+		gpio_set_value(ACTLED,AL);
+		mdelay(delay);
+	
 }
 
 static int __init rpi_gpio_init(void)
@@ -105,8 +102,6 @@ static int __init rpi_gpio_init(void)
 	gpio_direction_input(gpiophoto);
 	gpio_get_value(gpiophoto);
 	gpio_export(gpiophoto,false);
-
-	init_timer_key(&s_BlinkTimer, rpi_gpio_irqrising, 0);
 
         kobj_ref = kobject_create_and_add("raspi_photo",kernel_kobj);
  
@@ -127,7 +122,7 @@ static int __init rpi_gpio_init(void)
 	irqris = gpio_to_irq(gpiophoto);
 	printk(KERN_INFO "GPIO PHOTO mapped to IRQ : %d\n", irqris);
 	
-	a = request_irq(irqris,(irq_handler_t) rpi_gpio_irqrising, IRQF_TRIGGER_RISING | IRQF_TRIGGER_FALLING ,"rpi_gpio_irqrising",NULL);
+	a = request_irq(irqris,(irq_handler_t) rpi_gpio_irq, IRQF_TRIGGER_RISING | IRQF_TRIGGER_FALLING ,"rpi_gpio_irq",NULL);
 	
 	printk(KERN_INFO "irqris IRQ result: %d\n",a);
 	
@@ -156,7 +151,3 @@ static void __exit rpi_gpio_exit(void) {
 
 module_init(rpi_gpio_init);
 module_exit(rpi_gpio_exit);
-
-
-
-
