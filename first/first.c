@@ -12,21 +12,38 @@
 
 static unsigned int irq;
 static unsigned int irqnum = 0;
-volatile int delay = 100;
+
+static int delay = 100;
+static struct timer_list s_BlinkTimer;
 
 MODULE_LICENSE("GPL");
 MODULE_AUTHOR("Derek Molloy");
 MODULE_DESCRIPTION("A PHOTO/LED test drever for the RPi");
 MODULE_VERSION("0.1");
 
+static void TimerHandler(struct timer_list *unused) 
+{
+	static int AL=0;
+	
+    AL = !AL;
+	gpio_set_value(ACTLED,AL);
+	mdelay(delay);
+
+    mod_timer(&s_BlinkTimer, jiffies + msecs_to_jiffies(delay));
+}
+
 static irq_handler_t photo_irq(unsigned int irq, void *dev_id, struct pt_regs *regs)
 {
-	printk(KERN_INFO "photo_ intrrupt");
-
-		AL = !AL;
-		gpio_set_value(ACTLED,AL);
-		mdelay(delay);
-
+	if(gpio_get_value(photo)==1)
+	{
+		timer_setup(&s_BlinkTimer, TimerHandler , 0);
+		mod_timer(&s_BlinkTimer, jiffies + msecs_to_jiffies(delay));
+		printk(KERN_INFO "photo_ intrrupt");
+	}
+	else
+	{
+		del_timer(&s_BlinkTimer);
+	}
 	irqnum++;
 
 	return (irq_handler_t) IRQ_HANDLED;		
