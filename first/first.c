@@ -64,7 +64,7 @@ static irq_handler_t photo_irq(unsigned int irq, void *dev_id, struct pt_regs *r
 	}
 	else
 	{
-		schedule_timeout_interruptible(off_timer*HZ);
+		schedule_timeout_interruptible(off_timer*HZ); ////현재 자기자신한테 할당된 프로세스 시간을 반납하고 대기하는 방식
 		del_timer(&s_BlinkTimer);
 		printk(KERN_INFO "photo_ intrrupt  falling \n");
 		irqnum++;
