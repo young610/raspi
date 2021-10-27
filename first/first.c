@@ -5,6 +5,7 @@
 #include <linux/interrupt.h>
 #include <linux/delay.h>
 #include <linux/timer.h>
+#include <linux/jiffies.h>
 
 #define photo 17
 #define ACTLED 42
@@ -13,6 +14,7 @@
 static unsigned int irq;
 static unsigned int irqnum = 0;
 
+static int AL=0;
 static int delay = 100;
 static struct timer_list s_BlinkTimer;
 
@@ -23,13 +25,13 @@ MODULE_VERSION("0.1");
 
 static void TimerHandler(struct timer_list *unused) 
 {
-	static int AL=0;
-	
-    AL = !AL;
-	gpio_set_value(ACTLED,AL);
-	mdelay(delay);
-
-    mod_timer(&s_BlinkTimer, jiffies + msecs_to_jiffies(delay));
+	while(time_defore(jiffies,jiffies+(off_timer * HZ)))
+	{
+    	AL = !AL;
+		gpio_set_value(ACTLED,AL);
+		mod_timer(&s_BlinkTimer, jiffies + msecs_to_jiffies(delay));
+	}
+    printk(KERN_INFO "photo_interrupt11111");
 }
 
 static irq_handler_t photo_irq(unsigned int irq, void *dev_id, struct pt_regs *regs)
