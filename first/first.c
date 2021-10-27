@@ -14,6 +14,7 @@
 static unsigned int irq;
 static unsigned int irqnum = 0;
 
+static int off_timer = 2;
 static int delay = 100;
 static struct timer_list s_BlinkTimer;
 static int AL=0;
@@ -27,14 +28,22 @@ MODULE_AUTHOR("Derek Molloy");
 MODULE_DESCRIPTION("A PHOTO/LED test drever for the RPi");
 MODULE_VERSION("0.1");
 
-static ssize_t timer_store(struct kobject *kobj,struct kobj_attribute *attr,const char *buf, size_t count)
+static ssize_t delay_store(struct kobject *kobj,struct kobj_attribute *attr,const char *buf, size_t count)
 {
-        sscanf(buf,"%d",&delay);
+    sscanf(buf,"%d",&delay);
 	printk("Led delay value Write :%d \n",delay);
-        return count;
+    return count;
 }
 
-struct kobj_attribute timer_attr= __ATTR(timer,0664, 0,timer_store); 
+static ssize_t off_timer_store(struct kobject *kobj,struct kobj_attribute *attr,const char *buf, size_t count)
+{
+    sscanf(buf,"%d",&off_timer);
+	printk("Led delay value Write :%d \n",off_timer);
+    return count;
+}
+
+struct kobj_attribute delay_attr= __ATTR(timer,0664, 0,delay_store); 
+struct kobj_attribute off_timer_attr= __ATTR(timer,0664, 0,off_timer_store);
 
 static void TimerHandler1(struct timer_list *unused) 
 {
@@ -48,9 +57,14 @@ static irq_handler_t photo_irq(unsigned int irq, void *dev_id, struct pt_regs *r
 {
 	if(gpio_get_value(photo)==1)
 	{
-		timer_setup(&s_BlinkTimer, TimerHandler1 , 0);
-		mod_timer(&s_BlinkTimer, jiffies + msecs_to_jiffies(delay));
-		printk(KERN_INFO "photo_ intrrupt11111intrrup");
+		int b = jiffies+(off_timer*HZ);
+
+		while(time_after(b,jiffies))
+		{
+			timer_setup(&s_BlinkTimer, TimerHandler1 , 0);
+			mod_timer(&s_BlinkTimer, jiffies + msecs_to_jiffies(delay));
+			printk(KERN_INFO "photo_ intrrupt11111intrrup");
+		}
 	}
 	else
 	{
@@ -88,7 +102,11 @@ static int __init rpi_gpio_init(void)
 
 	kobj_ref = kobject_create_and_add("photo_timer",kernel_kobj);
  
-        if(sysfs_create_file(kobj_ref,&timer_attr.attr))
+        if(sysfs_create_file(kobj_ref,&delay_attr.attr))
+	{
+                pr_err("Cannot create delay file......\n");        
+    	}
+		if(sysfs_create_file(kobj_ref,&off_timer_attr.attr))
 	{
                 pr_err("Cannot create delay file......\n");        
     	}
@@ -108,7 +126,8 @@ static void __exit rpi_gpio_exit(void) {
 	gpio_free(LED);
 	gpio_free(photo);
 	kobject_put(kobj_ref); 
-	sysfs_remove_file(kernel_kobj, &timer_attr.attr);
+	sysfs_remove_file(kernel_kobj, &delay_attr.attr);
+	sysfs_remove_file(kernel_kobj, &off_timer_attr.attr);
 	class_destroy(dev_class);
 	printk(KERN_INFO "######### PHOTO INTERRUPT BYE ########\n");
 }
