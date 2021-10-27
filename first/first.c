@@ -42,8 +42,8 @@ static ssize_t off_timer_store(struct kobject *kobj,struct kobj_attribute *attr,
     return count;
 }
 
-struct kobj_attribute delay_attr= __ATTR(timer,0664, 0,delay_store); 
-struct kobj_attribute off_timer_attr= __ATTR(timer,0664, 0,off_timer_store);
+struct kobj_attribute delay_attr= __ATTR(delay,0664, 0,delay_store); 
+struct kobj_attribute off_timer_attr= __ATTR(off_timer,0664, 0,off_timer_store);
 
 static void TimerHandler1(struct timer_list *unused) 
 {
@@ -57,22 +57,19 @@ static irq_handler_t photo_irq(unsigned int irq, void *dev_id, struct pt_regs *r
 {
 	if(gpio_get_value(photo)==1)
 	{
-		int b = jiffies+(off_timer*HZ);
-
-		while(time_after(b,jiffies))
-		{
-			timer_setup(&s_BlinkTimer, TimerHandler1 , 0);
-			mod_timer(&s_BlinkTimer, jiffies + msecs_to_jiffies(delay));
-			printk(KERN_INFO "photo_ intrrupt11111intrrup");
-		}
+		timer_setup(&s_BlinkTimer, TimerHandler1 , 0);
+		mod_timer(&s_BlinkTimer, jiffies + msecs_to_jiffies(delay));
+		printk(KERN_INFO "photo_ intrrupt  rising : %d\n",delay);
+		irqnum++;
 	}
 	else
 	{
+		schedule_timeout_interruptible(off_timer*HZ);
 		del_timer(&s_BlinkTimer);
+		printk(KERN_INFO "photo_ intrrupt  falling \n");
+		irqnum++;
 	}
 	
-	irqnum++;
-
 	return (irq_handler_t) IRQ_HANDLED;		
 }
 
